@@ -13,14 +13,6 @@ def test_parse_last_timestamp_invalid_returns_none():
     assert watch_checkbox_agent.parse_last_timestamp('{"MESSAGE":"ping"}\n') is None
 
 
-def test_parse_dut_now_success():
-    assert watch_checkbox_agent.parse_dut_now("1726317513.470225\n") == 1726317513.470225
-
-
-def test_parse_dut_now_invalid_returns_none():
-    assert watch_checkbox_agent.parse_dut_now("invalid\n") is None
-
-
 @pytest.mark.parametrize("value", ["0", "-1"])
 def test_positive_int_rejects_non_positive(value):
     with pytest.raises(Exception):
@@ -48,22 +40,25 @@ def test_main_runs_command_when_timestamp_is_stale_and_exits_recovery_on_new_tim
         Result(
             stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
-        Result(stdout="170.000000\n", exited=0),
+        Result(
+            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+        ),
         Result(
             stdout='{"__REALTIME_TIMESTAMP":"130000000","MESSAGE":"ping"}\n', exited=0
         ),
-        Result(stdout="171.000000\n", exited=0),
     ]
     host = mocker.Mock()
     host.run.return_value = Result(exited=7)
 
     mocker.patch.object(watch_checkbox_agent, "LabDevice", return_value=device)
     mocker.patch.object(watch_checkbox_agent, "LocalHost", return_value=host)
-    mocker.patch.object(watch_checkbox_agent.time, "time", side_effect=[170.0, 171.0])
+    mocker.patch.object(
+        watch_checkbox_agent.time, "time", side_effect=[100.0, 170.0, 171.0]
+    )
     mocker.patch.object(
         watch_checkbox_agent.time,
         "sleep",
-        side_effect=[None, RuntimeError("stop")],
+        side_effect=[None, None, RuntimeError("stop")],
     )
     mocker.patch.object(
         watch_checkbox_agent.sys,
@@ -95,7 +90,6 @@ def test_main_retries_on_ssh_failure(mocker):
         Result(
             stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
-        Result(stdout="120.000000\n", exited=0),
     ]
     host = mocker.Mock()
 
@@ -126,7 +120,7 @@ def test_main_retries_on_ssh_failure(mocker):
     with pytest.raises(RuntimeError, match="stop"):
         watch_checkbox_agent.main()
 
-    assert device.run.call_count == 3
+    assert device.run.call_count == 2
     host.run.assert_not_called()
 
 
@@ -167,7 +161,6 @@ def test_main_retries_on_ssh_exception(mocker):
         Result(
             stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
-        Result(stdout="120.000000\n", exited=0),
     ]
     host = mocker.Mock()
 
@@ -198,22 +191,26 @@ def test_main_retries_on_ssh_exception(mocker):
     with pytest.raises(RuntimeError, match="stop"):
         watch_checkbox_agent.main()
 
-    assert device.run.call_count == 3
+    assert device.run.call_count == 2
     host.run.assert_not_called()
 
 
 def test_main_exits_on_recovery_command_exception(mocker):
     device = mocker.Mock()
     device.run.side_effect = [
-        Result(stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0),
-        Result(stdout="170.000000\n", exited=0),
+        Result(
+            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+        ),
+        Result(
+            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+        ),
     ]
     host = mocker.Mock()
     host.run.side_effect = OSError("local command failed")
 
     mocker.patch.object(watch_checkbox_agent, "LabDevice", return_value=device)
     mocker.patch.object(watch_checkbox_agent, "LocalHost", return_value=host)
-    mocker.patch.object(watch_checkbox_agent.time, "time", return_value=170.0)
+    mocker.patch.object(watch_checkbox_agent.time, "time", side_effect=[100.0, 170.0])
     mocker.patch.object(
         watch_checkbox_agent.sys,
         "argv",
@@ -242,18 +239,21 @@ def test_main_exits_when_no_new_timestamp_during_recovery(mocker):
         Result(
             stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
-        Result(stdout="170.000000\n", exited=0),
         Result(
             stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
-        Result(stdout="176.000000\n", exited=0),
+        Result(
+            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+        ),
     ]
     host = mocker.Mock()
     host.run.return_value = Result(exited=0)
 
     mocker.patch.object(watch_checkbox_agent, "LabDevice", return_value=device)
     mocker.patch.object(watch_checkbox_agent, "LocalHost", return_value=host)
-    mocker.patch.object(watch_checkbox_agent.time, "time", side_effect=[170.0, 176.0])
+    mocker.patch.object(
+        watch_checkbox_agent.time, "time", side_effect=[100.0, 170.0, 176.0]
+    )
     mocker.patch.object(watch_checkbox_agent.sys, "argv", [
         "watch-checkbox-agent",
         "--timeout",
@@ -273,17 +273,21 @@ def test_main_exits_when_no_new_timestamp_during_recovery(mocker):
     host.run.assert_called_once_with("echo recover")
 
 
-def test_main_uses_dut_shift_for_age_comparison(mocker):
+def test_main_uses_only_local_time_for_timeout(mocker):
     device = mocker.Mock()
     device.run.side_effect = [
-        Result(stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0),
-        Result(stdout="120.000000\n", exited=0),
+        Result(
+            stdout='{"__REALTIME_TIMESTAMP":"1000000","MESSAGE":"ping"}\n', exited=0
+        ),
+        Result(
+            stdout='{"__REALTIME_TIMESTAMP":"1000000","MESSAGE":"ping"}\n', exited=0
+        ),
     ]
     host = mocker.Mock()
 
     mocker.patch.object(watch_checkbox_agent, "LabDevice", return_value=device)
     mocker.patch.object(watch_checkbox_agent, "LocalHost", return_value=host)
-    mocker.patch.object(watch_checkbox_agent.time, "time", return_value=170.0)
+    mocker.patch.object(watch_checkbox_agent.time, "time", side_effect=[1000.0, 1020.0])
     mocker.patch.object(
         watch_checkbox_agent.time,
         "sleep",

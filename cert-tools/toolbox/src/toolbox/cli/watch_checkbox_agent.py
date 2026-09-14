@@ -11,7 +11,6 @@ SERVICE = "snap.checkbox.agent.service"
 JOURNALCTL = (
     f"journalctl -u {SERVICE} -n 1 --output=json --no-pager"
 )
-DUT_NOW = "date +%s.%6N"
 SSH_FAILURE_MARKERS = (
     "SSHException",
     "NoValidConnectionsError",
@@ -32,16 +31,6 @@ def parse_last_timestamp(output: str) -> float | None:
         microseconds = payload["__REALTIME_TIMESTAMP"]
         return float(microseconds) / 1_000_000
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
-        return None
-
-
-def parse_dut_now(output: str) -> float | None:
-    lines = [line for line in output.splitlines() if line.strip()]
-    if not lines:
-        return None
-    try:
-        return float(lines[-1].strip())
-    except ValueError:
         return None
 
 
@@ -95,6 +84,8 @@ def main():
     host = LocalHost()
     recovery_timestamp = None
     recovery_deadline = None
+    observed_timestamp = None
+    observed_at = None
 
     while True:
         try:
@@ -124,30 +115,17 @@ def main():
             if last_timestamp > recovery_timestamp:
                 recovery_timestamp = None
                 recovery_deadline = None
+                observed_timestamp = last_timestamp
+                observed_at = now
             elif now >= recovery_deadline:
                 sys.exit(1)
             time.sleep(args.delay)
             continue
 
-        try:
-            dut_now_result = device.run(DUT_NOW, hide=True)
-        except (OSError, SSHException, TimeoutError):
-            time.sleep(args.delay)
-            continue
-        if dut_now_result.failed:
-            if is_ssh_failure(dut_now_result.exited, dut_now_result.stderr):
-                time.sleep(args.delay)
-                continue
-            sys.exit(dut_now_result.exited)
-
-        dut_now = parse_dut_now(dut_now_result.stdout)
-        if dut_now is None:
-            time.sleep(args.delay)
-            continue
-
-        clock_shift = now - dut_now
-        age = now - (last_timestamp + clock_shift)
-        if age > args.timeout:
+        if observed_timestamp is None or last_timestamp > observed_timestamp:
+            observed_timestamp = last_timestamp
+            observed_at = now
+        elif observed_at is not None and now - observed_at > args.timeout:
             try:
                 host.run(args.command)
             except (OSError, TimeoutError):

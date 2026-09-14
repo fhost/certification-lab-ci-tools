@@ -7,15 +7,9 @@ from toolbox.devices import LocalHost
 from toolbox.devices.lab import LabDevice
 
 SERVICE = "snap.checkbox.agent.service"
-JOURNALCTL = [
-    "journalctl",
-    "-u",
-    SERVICE,
-    "-n",
-    "1",
-    "--output=short-unix",
-    "--no-pager",
-]
+JOURNALCTL = (
+    f"journalctl -u {SERVICE} -n 1 --output=short-unix --no-pager"
+)
 
 
 def parse_last_timestamp(output: str) -> float | None:

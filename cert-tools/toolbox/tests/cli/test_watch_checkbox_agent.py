@@ -13,6 +13,19 @@ def test_parse_last_timestamp_invalid_returns_none():
     assert watch_checkbox_agent.parse_last_timestamp("not-a-timestamp entry\n") is None
 
 
+@pytest.mark.parametrize(
+    ("exited", "stderr", "expected"),
+    [
+        (255, "SSHException('no route')", True),
+        (255, "NoValidConnectionsError()", True),
+        (255, "some other error", False),
+        (1, "SSHException('no route')", False),
+    ],
+)
+def test_is_ssh_failure(exited, stderr, expected):
+    assert watch_checkbox_agent.is_ssh_failure(exited, stderr) is expected
+
+
 def test_main_runs_command_when_timestamp_is_stale(mocker):
     device = mocker.Mock()
     device.run.return_value = Result(
@@ -79,4 +92,32 @@ def test_main_retries_on_ssh_failure(mocker):
         watch_checkbox_agent.main()
 
     assert device.run.call_count == 2
+    host.run.assert_not_called()
+
+
+def test_main_exits_on_non_ssh_journalctl_failure(mocker):
+    device = mocker.Mock()
+    device.run.return_value = Result(stderr="permission denied", exited=1)
+    host = mocker.Mock()
+
+    mocker.patch.object(watch_checkbox_agent, "LabDevice", return_value=device)
+    mocker.patch.object(watch_checkbox_agent, "LocalHost", return_value=host)
+    mocker.patch.object(
+        watch_checkbox_agent.sys,
+        "argv",
+        [
+            "watch-checkbox-agent",
+            "--timeout",
+            "60",
+            "--delay",
+            "1",
+            "--command",
+            "echo recover",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        watch_checkbox_agent.main()
+
+    assert exc_info.value.code == 1
     host.run.assert_not_called()

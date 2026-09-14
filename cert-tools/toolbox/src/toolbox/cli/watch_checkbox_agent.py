@@ -23,11 +23,24 @@ def parse_last_timestamp(output: str) -> float | None:
     if not lines:
         return None
 
-    timestamp, *_ = lines[-1].split(maxsplit=1)
     try:
+        timestamp = lines[-1].split(maxsplit=1)[0]
         return float(timestamp)
-    except ValueError:
+    except (IndexError, ValueError):
         return None
+
+
+def is_ssh_failure(exit_code: int, stderr: str) -> bool:
+    return exit_code == 255 and any(
+        marker in stderr
+        for marker in (
+            "SSHException",
+            "NoValidConnectionsError",
+            "AuthenticationException",
+            "socket.gaierror",
+            "TimeoutError",
+        )
+    )
 
 
 def main():
@@ -59,8 +72,10 @@ def main():
     while True:
         result = device.run(command=JOURNALCTL, hide=True)
         if result.failed:
-            time.sleep(args.delay)
-            continue
+            if is_ssh_failure(result.exited, result.stderr):
+                time.sleep(args.delay)
+                continue
+            sys.exit(1)
 
         last_timestamp = parse_last_timestamp(result.stdout)
         if last_timestamp is None:

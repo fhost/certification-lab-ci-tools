@@ -164,3 +164,34 @@ def test_main_retries_on_ssh_exception(mocker):
 
     assert device.run.call_count == 2
     host.run.assert_not_called()
+
+
+def test_main_exits_on_recovery_command_exception(mocker):
+    device = mocker.Mock()
+    device.run.return_value = Result(
+        stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0
+    )
+    host = mocker.Mock()
+    host.run.side_effect = OSError("local command failed")
+
+    mocker.patch.object(watch_checkbox_agent, "LabDevice", return_value=device)
+    mocker.patch.object(watch_checkbox_agent, "LocalHost", return_value=host)
+    mocker.patch.object(watch_checkbox_agent.time, "time", return_value=170.0)
+    mocker.patch.object(
+        watch_checkbox_agent.sys,
+        "argv",
+        [
+            "watch-checkbox-agent",
+            "--timeout",
+            "60",
+            "--delay",
+            "1",
+            "--command",
+            "echo recover",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        watch_checkbox_agent.main()
+
+    assert exc_info.value.code == 255

@@ -10,6 +10,13 @@ SERVICE = "snap.checkbox.agent.service"
 JOURNALCTL = (
     f"journalctl -u {SERVICE} -n 1 --output=short-unix --no-pager"
 )
+SSH_FAILURE_MARKERS = (
+    "SSHException",
+    "NoValidConnectionsError",
+    "AuthenticationException",
+    "socket.gaierror",
+    "TimeoutError",
+)
 
 
 def parse_last_timestamp(output: str) -> float | None:
@@ -26,15 +33,9 @@ def parse_last_timestamp(output: str) -> float | None:
 
 
 def is_ssh_failure(exit_code: int, stderr: str) -> bool:
+    """Return whether a failed command likely failed at SSH transport level."""
     return exit_code == 255 and any(
-        marker in stderr
-        for marker in (
-            "SSHException",
-            "NoValidConnectionsError",
-            "AuthenticationException",
-            "socket.gaierror",
-            "TimeoutError",
-        )
+        marker in stderr for marker in SSH_FAILURE_MARKERS
     )
 
 
@@ -90,7 +91,10 @@ def main():
 
         age = time.time() - last_timestamp
         if age > args.timeout:
-            command_result = host.run(args.command)
+            try:
+                command_result = host.run(args.command)
+            except (OSError, TimeoutError):
+                sys.exit(255)
             sys.exit(command_result.exited)
 
         time.sleep(args.delay)

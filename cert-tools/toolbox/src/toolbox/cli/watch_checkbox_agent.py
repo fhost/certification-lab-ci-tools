@@ -1,3 +1,4 @@
+import json
 import sys
 import time
 from argparse import ArgumentParser, ArgumentTypeError
@@ -8,7 +9,7 @@ from toolbox.devices.lab import LabDevice
 
 SERVICE = "snap.checkbox.agent.service"
 JOURNALCTL = (
-    f"journalctl -u {SERVICE} -n 1 --output=short-unix --no-pager"
+    f"journalctl -u {SERVICE} -n 1 --output=json --no-pager"
 )
 SSH_FAILURE_MARKERS = (
     "SSHException",
@@ -20,15 +21,16 @@ SSH_FAILURE_MARKERS = (
 
 
 def parse_last_timestamp(output: str) -> float | None:
-    """Parse the unix timestamp of the last short-unix journal line."""
+    """Parse the unix timestamp in seconds from the last JSON journal line."""
     lines = [line for line in output.splitlines() if line.strip()]
     if not lines:
         return None
 
     try:
-        timestamp = lines[-1].split(maxsplit=1)[0]
-        return float(timestamp)
-    except (IndexError, ValueError):
+        payload = json.loads(lines[-1])
+        microseconds = payload["__REALTIME_TIMESTAMP"]
+        return float(microseconds) / 1_000_000
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return None
 
 

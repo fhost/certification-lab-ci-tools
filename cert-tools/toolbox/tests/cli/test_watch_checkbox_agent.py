@@ -5,12 +5,12 @@ from toolbox.cli import watch_checkbox_agent
 
 
 def test_parse_last_timestamp_success():
-    output = "1726317513.470225 host snap.checkbox.agent[100]: ping\n"
+    output = '{"__REALTIME_TIMESTAMP":"1726317513470225","MESSAGE":"ping"}\n'
     assert watch_checkbox_agent.parse_last_timestamp(output) == 1726317513.470225
 
 
 def test_parse_last_timestamp_invalid_returns_none():
-    assert watch_checkbox_agent.parse_last_timestamp("not-a-timestamp entry\n") is None
+    assert watch_checkbox_agent.parse_last_timestamp('{"MESSAGE":"ping"}\n') is None
 
 
 @pytest.mark.parametrize("value", ["0", "-1"])
@@ -37,8 +37,12 @@ def test_main_runs_command_when_timestamp_is_stale_and_exits_recovery_on_new_tim
 ):
     device = mocker.Mock()
     device.run.side_effect = [
-        Result(stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0),
-        Result(stdout="130.0 host snap.checkbox.agent[100]: ping\n", exited=0),
+        Result(
+            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+        ),
+        Result(
+            stdout='{"__REALTIME_TIMESTAMP":"130000000","MESSAGE":"ping"}\n', exited=0
+        ),
     ]
     host = mocker.Mock()
     host.run.return_value = Result(exited=7)
@@ -78,7 +82,7 @@ def test_main_retries_on_ssh_failure(mocker):
     device = mocker.Mock()
     device.run.side_effect = [
         Result(stderr="SSHException('no route')", exited=255),
-        Result(stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0),
+        Result(stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0),
     ]
     host = mocker.Mock()
 
@@ -147,7 +151,7 @@ def test_main_retries_on_ssh_exception(mocker):
     device = mocker.Mock()
     device.run.side_effect = [
         OSError("network down"),
-        Result(stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0),
+        Result(stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0),
     ]
     host = mocker.Mock()
 
@@ -185,7 +189,7 @@ def test_main_retries_on_ssh_exception(mocker):
 def test_main_exits_on_recovery_command_exception(mocker):
     device = mocker.Mock()
     device.run.return_value = Result(
-        stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0
+        stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
     )
     host = mocker.Mock()
     host.run.side_effect = OSError("local command failed")
@@ -218,8 +222,12 @@ def test_main_exits_on_recovery_command_exception(mocker):
 def test_main_exits_when_no_new_timestamp_during_recovery(mocker):
     device = mocker.Mock()
     device.run.side_effect = [
-        Result(stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0),
-        Result(stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0),
+        Result(
+            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+        ),
+        Result(
+            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+        ),
     ]
     host = mocker.Mock()
     host.run.return_value = Result(exited=0)

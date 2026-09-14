@@ -74,7 +74,7 @@ def main():
 
     while True:
         try:
-            result = device.run(command=JOURNALCTL, hide=True)
+            result = device.run(JOURNALCTL, hide=True)
         except (OSError, SSHException, TimeoutError):
             time.sleep(args.delay)
             continue

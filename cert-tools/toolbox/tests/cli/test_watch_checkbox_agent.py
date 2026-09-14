@@ -97,7 +97,7 @@ def test_main_retries_on_ssh_failure(mocker):
 
 def test_main_exits_on_non_ssh_journalctl_failure(mocker):
     device = mocker.Mock()
-    device.run.return_value = Result(stderr="permission denied", exited=1)
+    device.run.return_value = Result(stderr="permission denied", exited=23)
     host = mocker.Mock()
 
     mocker.patch.object(watch_checkbox_agent, "LabDevice", return_value=device)
@@ -119,5 +119,5 @@ def test_main_exits_on_non_ssh_journalctl_failure(mocker):
     with pytest.raises(SystemExit) as exc_info:
         watch_checkbox_agent.main()
 
-    assert exc_info.value.code == 1
+    assert exc_info.value.code == 23
     host.run.assert_not_called()

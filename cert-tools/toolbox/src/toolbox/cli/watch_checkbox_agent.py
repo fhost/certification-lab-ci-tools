@@ -75,7 +75,7 @@ def main():
             if is_ssh_failure(result.exited, result.stderr):
                 time.sleep(args.delay)
                 continue
-            sys.exit(1)
+            sys.exit(result.exited)
 
         last_timestamp = parse_last_timestamp(result.stdout)
         if last_timestamp is None:

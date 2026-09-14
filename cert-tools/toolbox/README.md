@@ -237,8 +237,9 @@ configured timeout, it executes a caller-specified command locally on the
 agent and enters recovery mode. In recovery mode, the script waits up to
 `--recovery-timeout` seconds for a newer timestamp to appear; if none appears,
 it exits with a failure status. If a newer timestamp appears in time, it
-returns to normal monitoring mode. SSH failures are treated as transient: the
-script waits and retries.
+returns to normal monitoring mode. To handle unsynchronized DUT clocks, it
+computes the DUT/local time shift before evaluating entry age. SSH failures are
+treated as transient: the script waits and retries.
 
 ```bash
 # DEVICE_IP (and optionally DEVICE_USER / DEVICE_PWD) must be set

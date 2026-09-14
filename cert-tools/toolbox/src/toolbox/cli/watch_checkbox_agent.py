@@ -67,35 +67,63 @@ def main():
         required=True,
         help="Command to run when the latest checkbox agent journal entry is older than --timeout",
     )
+    parser.add_argument(
+        "--recovery-timeout",
+        type=positive_int,
+        default=300,
+        help=(
+            "After running --command, maximum time in seconds allowed to observe a "
+            "newer checkbox journal timestamp before exiting"
+        ),
+    )
     args = parser.parse_args()
 
     device = LabDevice()
     host = LocalHost()
+    recovery_timestamp = None
+    recovery_deadline = None
 
     while True:
         try:
             result = device.run(JOURNALCTL, hide=True)
         except (OSError, SSHException, TimeoutError):
+            if recovery_deadline is not None and time.time() >= recovery_deadline:
+                sys.exit(1)
             time.sleep(args.delay)
             continue
         if result.failed:
             if is_ssh_failure(result.exited, result.stderr):
+                if recovery_deadline is not None and time.time() >= recovery_deadline:
+                    sys.exit(1)
                 time.sleep(args.delay)
                 continue
             sys.exit(result.exited)
 
         last_timestamp = parse_last_timestamp(result.stdout)
+        now = time.time()
         if last_timestamp is None:
+            if recovery_deadline is not None and now >= recovery_deadline:
+                sys.exit(1)
             time.sleep(args.delay)
             continue
 
-        age = time.time() - last_timestamp
+        if recovery_deadline is not None:
+            if last_timestamp > recovery_timestamp:
+                recovery_timestamp = None
+                recovery_deadline = None
+            elif now >= recovery_deadline:
+                sys.exit(1)
+            time.sleep(args.delay)
+            continue
+
+        age = now - last_timestamp
         if age > args.timeout:
             try:
-                command_result = host.run(args.command)
+                host.run(args.command)
             except (OSError, TimeoutError):
                 sys.exit(255)
-            sys.exit(command_result.exited)
+            recovery_timestamp = last_timestamp
+            recovery_deadline = now + args.recovery_timeout
 
         time.sleep(args.delay)
 

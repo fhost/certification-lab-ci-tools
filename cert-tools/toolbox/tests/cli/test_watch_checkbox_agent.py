@@ -32,17 +32,25 @@ def test_is_ssh_failure(exited, stderr, expected):
     assert watch_checkbox_agent.is_ssh_failure(exited, stderr) is expected
 
 
-def test_main_runs_command_when_timestamp_is_stale(mocker):
+def test_main_runs_command_when_timestamp_is_stale_and_exits_recovery_on_new_timestamp(
+    mocker,
+):
     device = mocker.Mock()
-    device.run.return_value = Result(
-        stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0
-    )
+    device.run.side_effect = [
+        Result(stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0),
+        Result(stdout="130.0 host snap.checkbox.agent[100]: ping\n", exited=0),
+    ]
     host = mocker.Mock()
     host.run.return_value = Result(exited=7)
 
     mocker.patch.object(watch_checkbox_agent, "LabDevice", return_value=device)
     mocker.patch.object(watch_checkbox_agent, "LocalHost", return_value=host)
-    mocker.patch.object(watch_checkbox_agent.time, "time", return_value=170.0)
+    mocker.patch.object(watch_checkbox_agent.time, "time", side_effect=[170.0, 171.0])
+    mocker.patch.object(
+        watch_checkbox_agent.time,
+        "sleep",
+        side_effect=[None, RuntimeError("stop")],
+    )
     mocker.patch.object(
         watch_checkbox_agent.sys,
         "argv",
@@ -52,16 +60,18 @@ def test_main_runs_command_when_timestamp_is_stale(mocker):
             "60",
             "--delay",
             "1",
+            "--recovery-timeout",
+            "20",
             "--command",
             "echo recover",
         ],
     )
 
-    with pytest.raises(SystemExit) as exc_info:
+    with pytest.raises(RuntimeError, match="stop"):
         watch_checkbox_agent.main()
 
-    assert exc_info.value.code == 7
     host.run.assert_called_once_with("echo recover")
+    assert device.run.call_count == 2
 
 
 def test_main_retries_on_ssh_failure(mocker):
@@ -89,6 +99,8 @@ def test_main_retries_on_ssh_failure(mocker):
             "60",
             "--delay",
             "1",
+            "--recovery-timeout",
+            "20",
             "--command",
             "echo recover",
         ],
@@ -117,6 +129,8 @@ def test_main_exits_on_non_ssh_journalctl_failure(mocker):
             "60",
             "--delay",
             "1",
+            "--recovery-timeout",
+            "20",
             "--command",
             "echo recover",
         ],
@@ -154,6 +168,8 @@ def test_main_retries_on_ssh_exception(mocker):
             "60",
             "--delay",
             "1",
+            "--recovery-timeout",
+            "20",
             "--command",
             "echo recover",
         ],
@@ -186,6 +202,8 @@ def test_main_exits_on_recovery_command_exception(mocker):
             "60",
             "--delay",
             "1",
+            "--recovery-timeout",
+            "20",
             "--command",
             "echo recover",
         ],
@@ -195,3 +213,34 @@ def test_main_exits_on_recovery_command_exception(mocker):
         watch_checkbox_agent.main()
 
     assert exc_info.value.code == 255
+
+
+def test_main_exits_when_no_new_timestamp_during_recovery(mocker):
+    device = mocker.Mock()
+    device.run.side_effect = [
+        Result(stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0),
+        Result(stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0),
+    ]
+    host = mocker.Mock()
+    host.run.return_value = Result(exited=0)
+
+    mocker.patch.object(watch_checkbox_agent, "LabDevice", return_value=device)
+    mocker.patch.object(watch_checkbox_agent, "LocalHost", return_value=host)
+    mocker.patch.object(watch_checkbox_agent.time, "time", side_effect=[170.0, 176.0])
+    mocker.patch.object(watch_checkbox_agent.sys, "argv", [
+        "watch-checkbox-agent",
+        "--timeout",
+        "60",
+        "--delay",
+        "1",
+        "--recovery-timeout",
+        "5",
+        "--command",
+        "echo recover",
+    ])
+
+    with pytest.raises(SystemExit) as exc_info:
+        watch_checkbox_agent.main()
+
+    assert exc_info.value.code == 1
+    host.run.assert_called_once_with("echo recover")

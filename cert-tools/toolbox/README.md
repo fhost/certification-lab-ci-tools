@@ -234,11 +234,15 @@ setup_apt_cache_proxy = "toolbox.cli.setup_apt_cache_proxy:main"
 Monitors the latest journal entry timestamp of `snap.checkbox.agent.service` on
 the device under test over SSH. If the latest timestamp is older than the
 configured timeout, it executes a caller-specified command locally on the
-agent. SSH failures are treated as transient: the script waits and retries.
+agent and enters recovery mode. In recovery mode, the script waits up to
+`--recovery-timeout` seconds for a newer timestamp to appear; if none appears,
+it exits with a failure status. If a newer timestamp appears in time, it
+returns to normal monitoring mode. SSH failures are treated as transient: the
+script waits and retries.
 
 ```bash
 # DEVICE_IP (and optionally DEVICE_USER / DEVICE_PWD) must be set
-watch-checkbox-agent --timeout 300 --delay 30 --command "echo recover"
+watch-checkbox-agent --timeout 300 --recovery-timeout 120 --delay 30 --command "echo recover"
 ```
 
 ### `ensure-kernel`

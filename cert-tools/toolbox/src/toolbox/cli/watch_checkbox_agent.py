@@ -21,14 +21,14 @@ SSH_FAILURE_MARKERS = (
 
 
 def parse_last_timestamp(output: str) -> float | None:
-    """Parse the unix timestamp in seconds from the last JSON journal line."""
+    """Parse the monotonic timestamp from the last JSON journal line."""
     lines = [line for line in output.splitlines() if line.strip()]
     if not lines:
         return None
 
     try:
         payload = json.loads(lines[-1])
-        microseconds = payload["__REALTIME_TIMESTAMP"]
+        microseconds = payload["__MONOTONIC_TIMESTAMP"]
         return float(microseconds) / 1_000_000
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return None

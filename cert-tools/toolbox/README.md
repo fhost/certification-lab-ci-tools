@@ -231,10 +231,11 @@ setup_apt_cache_proxy = "toolbox.cli.setup_apt_cache_proxy:main"
 
 ### `watch-checkbox-agent`
 
-Monitors the latest journal entry timestamp of `snap.checkbox.agent.service` on
-the device under test over SSH. If the latest timestamp is older than the
-configured timeout, it executes a caller-specified command locally on the
-agent and enters recovery mode. In recovery mode, the script waits up to
+Monitors the latest monotonic journal timestamp of
+`snap.checkbox.agent.service` on the device under test over SSH. If no newer
+timestamp appears before the configured timeout, it executes a
+caller-specified command locally on the agent and enters recovery mode. In
+recovery mode, the script waits up to
 `--recovery-timeout` seconds for a newer timestamp to appear; if none appears,
 it exits with a failure status. If a newer timestamp appears in time, it
 returns to normal monitoring mode. Timeout checks are based only on local time,

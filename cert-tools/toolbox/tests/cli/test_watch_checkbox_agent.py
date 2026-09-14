@@ -5,7 +5,7 @@ from toolbox.cli import watch_checkbox_agent
 
 
 def test_parse_last_timestamp_success():
-    output = '{"__REALTIME_TIMESTAMP":"1726317513470225","MESSAGE":"ping"}\n'
+    output = '{"__MONOTONIC_TIMESTAMP":"1726317513470225","MESSAGE":"ping"}\n'
     assert watch_checkbox_agent.parse_last_timestamp(output) == 1726317513.470225
 
 
@@ -38,13 +38,13 @@ def test_main_runs_command_when_timestamp_is_stale_and_exits_recovery_on_new_tim
     device = mocker.Mock()
     device.run.side_effect = [
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"130000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"130000000","MESSAGE":"ping"}\n', exited=0
         ),
     ]
     host = mocker.Mock()
@@ -88,7 +88,7 @@ def test_main_retries_on_ssh_failure(mocker):
     device.run.side_effect = [
         Result(stderr="SSHException('no route')", exited=255),
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
     ]
     host = mocker.Mock()
@@ -159,7 +159,7 @@ def test_main_retries_on_ssh_exception(mocker):
     device.run.side_effect = [
         OSError("network down"),
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
     ]
     host = mocker.Mock()
@@ -199,10 +199,10 @@ def test_main_exits_on_recovery_command_exception(mocker):
     device = mocker.Mock()
     device.run.side_effect = [
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
     ]
     host = mocker.Mock()
@@ -237,13 +237,13 @@ def test_main_exits_when_no_new_timestamp_during_recovery(mocker):
     device = mocker.Mock()
     device.run.side_effect = [
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"100000000","MESSAGE":"ping"}\n', exited=0
         ),
     ]
     host = mocker.Mock()
@@ -277,10 +277,10 @@ def test_main_uses_only_local_time_for_timeout(mocker):
     device = mocker.Mock()
     device.run.side_effect = [
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"1000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"1000000","MESSAGE":"ping"}\n', exited=0
         ),
         Result(
-            stdout='{"__REALTIME_TIMESTAMP":"1000000","MESSAGE":"ping"}\n', exited=0
+            stdout='{"__MONOTONIC_TIMESTAMP":"1000000","MESSAGE":"ping"}\n', exited=0
         ),
     ]
     host = mocker.Mock()

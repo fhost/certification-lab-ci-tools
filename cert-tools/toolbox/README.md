@@ -221,11 +221,24 @@ the `toolbox` package and the corresponding entry points:
 wait-for-ssh = "toolbox.cli.wait_for_ssh:main"
 wait-for-packages-complete = "toolbox.cli.wait_for_packages_complete:main"
 wait-for-snap-changes = "toolbox.cli.wait_for_snap_changes:main"
+watch-checkbox-agent = "toolbox.cli.watch_checkbox_agent:main"
 install-checkbox-snaps = "toolbox.cli.install_checkbox_snaps:main"
 install-checkbox-debs = "toolbox.cli.install_checkbox_debs:main"
 ensure-stable-snaps = "toolbox.cli.ensure_stable_snaps:main"
 ensure-kernel = "toolbox.cli.ensure_kernel:main"
 setup_apt_cache_proxy = "toolbox.cli.setup_apt_cache_proxy:main"
+```
+
+### `watch-checkbox-agent`
+
+Monitors the latest journal entry timestamp of `snap.checkbox.agent.service` on
+the device under test over SSH. If the latest timestamp is older than the
+configured timeout, it executes a caller-specified command locally on the
+agent. SSH failures are treated as transient: the script waits and retries.
+
+```bash
+# DEVICE_IP (and optionally DEVICE_USER / DEVICE_PWD) must be set
+watch-checkbox-agent --timeout 300 --delay 30 --command "echo recover"
 ```
 
 ### `ensure-kernel`

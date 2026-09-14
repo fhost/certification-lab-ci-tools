@@ -13,6 +13,12 @@ def test_parse_last_timestamp_invalid_returns_none():
     assert watch_checkbox_agent.parse_last_timestamp("not-a-timestamp entry\n") is None
 
 
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_positive_int_rejects_non_positive(value):
+    with pytest.raises(Exception):
+        watch_checkbox_agent.positive_int(value)
+
+
 @pytest.mark.parametrize(
     ("exited", "stderr", "expected"),
     [
@@ -120,4 +126,41 @@ def test_main_exits_on_non_ssh_journalctl_failure(mocker):
         watch_checkbox_agent.main()
 
     assert exc_info.value.code == 23
+    host.run.assert_not_called()
+
+
+def test_main_retries_on_ssh_exception(mocker):
+    device = mocker.Mock()
+    device.run.side_effect = [
+        OSError("network down"),
+        Result(stdout="100.0 host snap.checkbox.agent[100]: ping\n", exited=0),
+    ]
+    host = mocker.Mock()
+
+    mocker.patch.object(watch_checkbox_agent, "LabDevice", return_value=device)
+    mocker.patch.object(watch_checkbox_agent, "LocalHost", return_value=host)
+    mocker.patch.object(watch_checkbox_agent.time, "time", return_value=120.0)
+    mocker.patch.object(
+        watch_checkbox_agent.time,
+        "sleep",
+        side_effect=[None, RuntimeError("stop")],
+    )
+    mocker.patch.object(
+        watch_checkbox_agent.sys,
+        "argv",
+        [
+            "watch-checkbox-agent",
+            "--timeout",
+            "60",
+            "--delay",
+            "1",
+            "--command",
+            "echo recover",
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="stop"):
+        watch_checkbox_agent.main()
+
+    assert device.run.call_count == 2
     host.run.assert_not_called()

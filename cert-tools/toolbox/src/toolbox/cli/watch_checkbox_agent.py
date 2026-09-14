@@ -1,7 +1,8 @@
 import sys
 import time
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentTypeError
 
+from paramiko.ssh_exception import SSHException
 from toolbox.devices import LocalHost
 from toolbox.devices.lab import LabDevice
 
@@ -43,6 +44,13 @@ def is_ssh_failure(exit_code: int, stderr: str) -> bool:
     )
 
 
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
 def main():
     parser = ArgumentParser(
         description="Monitor checkbox agent logs and run a command if they become stale"
@@ -50,12 +58,12 @@ def main():
     parser.add_argument(
         "--timeout",
         required=True,
-        type=int,
+        type=positive_int,
         help="Maximum allowed age (seconds) of latest checkbox agent journal entry",
     )
     parser.add_argument(
         "--delay",
-        type=int,
+        type=positive_int,
         default=30,
         help="Delay between checks in seconds",
     )
@@ -70,7 +78,11 @@ def main():
     host = LocalHost()
 
     while True:
-        result = device.run(command=JOURNALCTL, hide=True)
+        try:
+            result = device.run(command=JOURNALCTL, hide=True)
+        except (OSError, SSHException, TimeoutError):
+            time.sleep(args.delay)
+            continue
         if result.failed:
             if is_ssh_failure(result.exited, result.stderr):
                 time.sleep(args.delay)
